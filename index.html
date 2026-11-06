@@ -133,7 +133,6 @@
     .th-memo-btn { background: #ecc94b; border: 1px solid #d69e2e; color: #744210; font-weight: bold; padding: 1px 4px; font-size: 0.65rem; border-radius: 3px; cursor: pointer; margin-top: 2px; }
     .th-memo-btn.active-memo { background: #dd6b20; color: white; }
 
-    /* モーダル共通 */
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0, 0, 0, 0.4); z-index: 1000; justify-content: center; align-items: center;
@@ -146,7 +145,6 @@
     .modal-title { font-weight: bold; font-size: 1rem; color: #2d3748; }
     .summary-list-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.85rem; }
 
-    /* 全員集計モーダル用特大サイズ */
     .modal-content-large {
       background: white; padding: 20px; border-radius: 10px; max-width: 800px; width: 95%;
       box-shadow: 0 8px 25px rgba(0,0,0,0.25); max-height: 85vh; display: flex; flex-direction: column;
@@ -164,8 +162,6 @@
       table { border: 1.5px solid #000; width: 100%; table-layout: auto; }
       th, td { border: 1px solid #000 !important; color: black !important; font-size: 0.7rem; padding: 3px; }
       th { background: #eee !important; color: black !important; }
-      
-      /* 印刷時に全員集計モーダルの中身を展開して綺麗に印刷させる設定 */
       .modal-overlay { display: block !important; position: static !important; background: none !important; width: 100% !important; height: auto !important; }
       .modal-content-large { max-width: 100% !important; width: 100% !important; box-shadow: none !important; padding: 0 !important; max-height: none !important; }
       .modal-header, .modal-body-scroll { display: block !important; overflow: visible !important; }
@@ -236,7 +232,7 @@
     </div>
   </div>
 
-  <!-- 全員分集計一覧ポップアップ（印刷対応） -->
+  <!-- 全員分集計一覧ポップアップ -->
   <div id="all-summary-modal" class="modal-overlay">
     <div class="modal-content-large">
       <div class="modal-header">
@@ -252,24 +248,26 @@
 
   <!-- 【タブ2】設定画面 -->
   <div id="panel-settings" class="panel no-print">
-    <h3>1. 生徒名簿の設定</h3>
-    <div class="control-group">
-      <button class="btn btn-success" onclick="downloadCSVTemplate()">名簿CSVテンプレートをダウンロード</button>
-    </div>
-    <div class="control-group">
-      <label>CSVファイルを選択:</label>
-      <input type="file" id="csv-file" accept=".csv, .txt">
-      <button class="btn btn-primary" onclick="importCSV()">名簿を読み込む</button>
-    </div>
-
-    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
-
-    <h3>2. 担当科目の登録</h3>
+    <h3>1. 担当科目の登録</h3>
     <div class="control-group">
       <input type="text" id="new-subject-name" placeholder="科目名 (例: 英語コミュニケーションⅠ)">
       <button class="btn btn-primary" onclick="addSubject()">科目を追加</button>
     </div>
     <div id="subject-list" class="simple-list"></div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>2. 科目別 生徒名簿の設定</h3>
+    <div class="control-group">
+      <button class="btn btn-success" onclick="downloadCSVTemplate()">名簿CSVテンプレートをダウンロード</button>
+    </div>
+    <div class="control-group">
+      <label>対象科目:</label>
+      <select id="import-subject-select"></select>
+      <label>CSVファイル:</label>
+      <input type="file" id="csv-file" accept=".csv, .txt">
+      <button class="btn btn-primary" onclick="importCSV()">名簿を読み込む</button>
+    </div>
 
     <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
 
@@ -315,10 +313,12 @@
   </div>
 
   <script>
-    let students = [], subjects = [], timetable = {}, lessons = [], attendanceData = {}, attendanceMemos = {}, attendanceDrawings = {};
+    let subjects = [], timetable = {}, lessons = [], attendanceData = {}, attendanceMemos = {}, attendanceDrawings = {};
+    // 科目ごとに生徒名簿を保持するオブジェクトに変更 (例: { "英語コミュニケーションⅠ": [...], "数学Ⅰ": [...] })
+    let subjectStudents = {};
     
     try {
-      students = JSON.parse(localStorage.getItem('attendance_students')) || [];
+      subjectStudents = JSON.parse(localStorage.getItem('attendance_subject_students')) || {};
       subjects = JSON.parse(localStorage.getItem('attendance_subjects')) || [];
       timetable = JSON.parse(localStorage.getItem('attendance_timetable')) || {};
       lessons = JSON.parse(localStorage.getItem('attendance_lessons')) || [];
@@ -326,7 +326,7 @@
       attendanceMemos = JSON.parse(localStorage.getItem('attendance_memos')) || {};
       attendanceDrawings = JSON.parse(localStorage.getItem('attendance_drawings')) || {};
     } catch (e) {
-      students = []; subjects = []; timetable = {}; lessons = []; attendanceData = {}; attendanceMemos = {}; attendanceDrawings = {};
+      subjectStudents = {}; subjects = []; timetable = {}; lessons = []; attendanceData = {}; attendanceMemos = {}; attendanceDrawings = {};
     }
     
     let currentSubject = subjects[0] || "";
@@ -339,7 +339,7 @@
 
     function saveData() {
       try {
-        localStorage.setItem('attendance_students', JSON.stringify(students));
+        localStorage.setItem('attendance_subject_students', JSON.stringify(subjectStudents));
         localStorage.setItem('attendance_subjects', JSON.stringify(subjects));
         localStorage.setItem('attendance_timetable', JSON.stringify(timetable));
         localStorage.setItem('attendance_lessons', JSON.stringify(lessons));
@@ -350,7 +350,7 @@
     }
 
     function exportBackup() {
-      const backupData = { students, subjects, timetable, lessons, attendanceData, attendanceMemos, attendanceDrawings, exportedAt: new Date().toISOString() };
+      const backupData = { subjectStudents, subjects, timetable, lessons, attendanceData, attendanceMemos, attendanceDrawings, exportedAt: new Date().toISOString() };
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -366,7 +366,8 @@
         try {
           const data = JSON.parse(e.target.result);
           if (confirm("現在のデータを上書きして復元しますか？")) {
-            students = data.students || []; subjects = data.subjects || []; timetable = data.timetable || {};
+            subjectStudents = data.subjectStudents || data.students || {};
+            subjects = data.subjects || []; timetable = data.timetable || {};
             lessons = data.lessons || []; attendanceData = data.attendanceData || {};
             attendanceMemos = data.attendanceMemos || {}; attendanceDrawings = data.attendanceDrawings || {};
             saveData(); alert("復元が完了しました！"); location.reload();
@@ -403,6 +404,7 @@
       if (!val) { alert("科目名を入力してください。"); return; }
       if (subjects.includes(val)) { alert("すでに登録されています。"); return; }
       subjects.push(val);
+      if (!subjectStudents[val]) subjectStudents[val] = [];
       if (!currentSubject) currentSubject = val;
       input.value = "";
       saveData();
@@ -410,8 +412,9 @@
     }
 
     function deleteSubject(subjectName) {
-      if (confirm(`科目「${subjectName}」を削除しますか？`)) {
+      if (confirm(`科目「${subjectName}」を削除しますか？（登録されている生徒名簿や授業データも削除されます）`)) {
         subjects = subjects.filter(s => s !== subjectName);
+        delete subjectStudents[subjectName];
         if (currentSubject === subjectName) currentSubject = subjects[0] || "";
         saveData();
         renderSettingsUI();
@@ -449,12 +452,20 @@
 
     function renderSettingsUI() {
       const subContainer = document.getElementById('subject-list');
-      if (!subContainer) return;
-      let subHtml = subjects.length === 0 ? '<span style="color:#718096; font-size:0.8rem;">登録されている科目はありません。</span>' : '';
+      const importSelect = document.getElementById('import-subject-select');
+      if (!subContainer || !importSelect) return;
+
+      let subHtml = subjects.length === 0 ? '<span style="color:#718096; font-size:0.8rem;">登録されている科目はありません。まずは上部で科目を登録してください。</span>' : '';
+      let selectHtml = '';
+      
       subjects.forEach(sub => {
-        subHtml += `<div class="tag-item">${sub} <button type="button" class="btn btn-danger" style="padding:1px 4px; font-size:0.6rem;" onclick="deleteSubject('${sub}')">×</button></div>`;
+        const count = (subjectStudents[sub] || []).length;
+        subHtml += `<div class="tag-item">${sub} (生徒数: ${count}名) <button type="button" class="btn btn-danger" style="padding:1px 4px; font-size:0.6rem;" onclick="deleteSubject('${sub}')">×</button></div>`;
+        selectHtml += `<option value="${sub}">${sub}</option>`;
       });
+
       subContainer.innerHTML = subHtml;
+      importSelect.innerHTML = selectHtml;
       renderTimetableGrid();
     }
 
@@ -482,7 +493,9 @@
       const index = lessons.indexOf(lessonKey);
       if (index !== -1) {
         lessons[index] = newKey;
-        students.forEach(s => {
+        // 該当科目の全生徒に対して attendanceData のキーを付け替え
+        const targetStudents = subjectStudents[match[3]] || [];
+        targetStudents.forEach(s => {
           if (attendanceData[`${s.id}_${lessonKey}`]) {
             attendanceData[`${s.id}_${newKey}`] = attendanceData[`${s.id}_${lessonKey}`];
             delete attendanceData[`${s.id}_${lessonKey}`];
@@ -499,7 +512,10 @@
     function deleteLessonHeader(lessonKey) {
       if (confirm(`この授業を削除しますか？`)) {
         lessons = lessons.filter(l => l !== lessonKey);
-        students.forEach(s => delete attendanceData[`${s.id}_${lessonKey}`]);
+        const match = lessonKey.match(/\((.*?)\)$/);
+        const subName = match ? match[1] : "";
+        const targetStudents = subjectStudents[subName] || [];
+        targetStudents.forEach(s => delete attendanceData[`${s.id}_${lessonKey}`]);
         delete attendanceMemos[lessonKey];
         delete attendanceDrawings[lessonKey];
         if (activeMemoLesson === lessonKey) closeMemo();
@@ -631,8 +647,11 @@
     }
 
     function importCSV() {
+      const targetSub = document.getElementById('import-subject-select').value;
+      if (!targetSub) { alert("対象とする科目を選択してください。（先に科目を登録してください）"); return; }
       const fileInput = document.getElementById('csv-file');
       if (!fileInput || !fileInput.files[0]) { alert("CSVファイルを選択してください。"); return; }
+
       const reader = new FileReader();
       reader.onload = function(e) {
         const lines = e.target.result.split(/\r\n|\n/);
@@ -646,8 +665,12 @@
             newStudents.push({ id: newStudents.length + 1, className: cols[0].trim(), number: parseInt(cols[1].trim()) || (newStudents.length + 1), name: cols[2].trim() });
           }
         });
-        if (newStudents.length > 0 && confirm(`${newStudents.length}名の名簿を読み込みます。上書きしてよろしいですか？`)) {
-          students = newStudents; saveData(); alert("名簿をインポートしました！"); fileInput.value = ""; renderTable();
+        if (newStudents.length > 0 && confirm(`科目「${targetSub}」に ${newStudents.length}名の名簿を登録します。よろしいですか？`)) {
+          subjectStudents[targetSub] = newStudents;
+          saveData();
+          alert(`科目「${targetSub}」の名簿インポートが完了しました！`);
+          fileInput.value = "";
+          renderSettingsUI();
         }
       };
       reader.readAsText(fileInput.files[0], "UTF-8");
@@ -717,14 +740,15 @@
       document.getElementById('summary-modal').style.display = 'none';
     }
 
-    // 全員分の集計モーダルを開く
     function openAllSummaryModal() {
       const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
       document.getElementById('all-summary-modal-title').innerText = `📊 【${currentSubject}】全員分の出席集計一覧（全 ${allSubjectLessons.length} 回）`;
       
       const body = document.getElementById('all-summary-modal-body');
-      if (students.length === 0 || allSubjectLessons.length === 0) {
-        body.innerHTML = '<p style="text-align:center; color:#718096; padding:20px;">名簿または授業が登録されていません。</p>';
+      const targetStudents = subjectStudents[currentSubject] || [];
+
+      if (targetStudents.length === 0 || allSubjectLessons.length === 0) {
+        body.innerHTML = '<p style="text-align:center; color:#718096; padding:20px;">この科目の名簿または授業が登録されていません。</p>';
         document.getElementById('all-summary-modal').style.display = 'flex';
         return;
       }
@@ -733,7 +757,7 @@
         <th>クラス/番号</th><th style="text-align:left;">氏名</th><th>出席</th><th>欠席</th><th>遅刻</th><th>早退</th><th>中抜け</th>
       </tr></thead><tbody>`;
 
-      students.forEach(student => {
+      targetStudents.forEach(student => {
         let counts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0 };
         allSubjectLessons.forEach(lesson => {
           const st = attendanceData[`${student.id}_${lesson}`] || "出席";
@@ -767,8 +791,8 @@
       let tabsHtml = '';
       
       if (subjects.length === 0) {
-        tabsContainer.innerHTML = '<span style="color:#e53e3e; font-size:0.85rem; font-weight:bold;">※「⚙️ 設定」画面から担当科目を登録し、生徒名簿をインポートしてください。</span>';
-        document.getElementById('attendance-tables-wrapper').innerHTML = '<p style="color:#718096; padding:15px; text-align:center;">科目や名簿が登録されていません。</p>';
+        tabsContainer.innerHTML = '<span style="color:#e53e3e; font-size:0.85rem; font-weight:bold;">※「⚙️ 設定」画面から担当科目を登録してください。</span>';
+        document.getElementById('attendance-tables-wrapper').innerHTML = '<p style="color:#718096; padding:15px; text-align:center;">科目が登録されていません。</p>';
         document.getElementById('pagination-bar-top').innerHTML = '';
         document.getElementById('pagination-bar-bottom').innerHTML = '';
         return;
@@ -791,8 +815,10 @@
       else if (activeMemoLesson) renderMemoArea();
 
       const wrapper = document.getElementById('attendance-tables-wrapper');
-      if (allSubjectLessons.length === 0 || students.length === 0) {
-        wrapper.innerHTML = '<p style="color:#718096; padding:15px; text-align:center;">この科目の授業日、または生徒名簿が登録されていません。</p>';
+      const targetStudents = subjectStudents[currentSubject] || [];
+
+      if (allSubjectLessons.length === 0 || targetStudents.length === 0) {
+        wrapper.innerHTML = `<p style="color:#718096; padding:15px; text-align:center;">「${currentSubject}」の授業日、または生徒名簿が登録されていません。<br><span style="font-size:0.8rem;">(設定画面から名簿をインポートするか、授業日を追加してください)</span></p>`;
         document.getElementById('pagination-bar-top').innerHTML = '';
         document.getElementById('pagination-bar-bottom').innerHTML = '';
         return;
@@ -828,7 +854,7 @@
       displayLessons.forEach(lesson => { wrapperHtml += `<th>${formatLessonHeader(lesson)}</th>`; });
       wrapperHtml += `<th class="no-print">集計</th></tr></thead><tbody>`;
 
-      students.forEach((student) => {
+      targetStudents.forEach((student) => {
         wrapperHtml += `<tr>`;
         const displayId = student.className ? `${student.className}-${student.number}` : student.number || student.id;
         wrapperHtml += `<td class="student-info">${displayId}</td>`;
@@ -865,7 +891,7 @@
       }
     }
 
-    window.onload = function() { renderTable(); };
+    window.onload = function() { renderSettingsUI(); renderTable(); };
   </script>
 </body>
 </html>
