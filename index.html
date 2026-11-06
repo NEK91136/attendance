@@ -110,14 +110,16 @@
     td.student-info { text-align: center; white-space: nowrap; font-size: 0.75rem; color: #718096; }
     td.name { text-align: left; font-weight: 600; white-space: nowrap; }
     
+    /* ステータスの色分け（出停を追加） */
     .status-select {
       width: 100%; padding: 4px 2px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e0; cursor: pointer; text-align-last: center; font-weight: 600; box-sizing: border-box;
     }
-    .status-select.is-present { background: #ffffff; color: #a0aec0; border-color: #e2e8f0; }
-    .status-select.is-absent  { background: #fed7d7; color: #9b2c2c; border-color: #feb2b2; }
-    .status-select.is-late    { background: #feebc8; color: #9c4221; border-color: #fbd38d; }
-    .status-select.is-early   { background: #c6f6d5; color: #22543d; border-color: #9ae6b4; }
-    .status-select.is-middle  { background: #bee3f8; color: #2c5282; border-color: #90cdf4; }
+    .status-select.is-present  { background: #ffffff; color: #a0aec0; border-color: #e2e8f0; }
+    .status-select.is-absent   { background: #fed7d7; color: #9b2c2c; border-color: #feb2b2; }
+    .status-select.is-late     { background: #feebc8; color: #9c4221; border-color: #fbd38d; }
+    .status-select.is-early    { background: #c6f6d5; color: #22543d; border-color: #9ae6b4; }
+    .status-select.is-middle   { background: #bee3f8; color: #2c5282; border-color: #90cdf4; }
+    .status-select.is-suspended{ background: #e9d8fd; color: #553c9a; border-color: #d6bcfa; }
 
     .active-memo-container { background: #fffff0; border: 1px solid #f6e05e; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
     .active-memo-container h3 { margin: 0 0 6px 0; font-size: 0.9rem; color: #d69e2e; display: flex; justify-content: space-between; align-items: center; }
@@ -138,7 +140,7 @@
       background: rgba(0, 0, 0, 0.4); z-index: 1000; justify-content: center; align-items: center;
     }
     .modal-content {
-      background: white; padding: 16px; border-radius: 10px; max-width: 450px; width: 90%;
+      background: white; padding: 16px; border-radius: 10px; max-width: 480px; width: 90%;
       box-shadow: 0 8px 20px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
     }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; }
@@ -146,7 +148,7 @@
     .summary-list-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.85rem; }
 
     .modal-content-large {
-      background: white; padding: 20px; border-radius: 10px; max-width: 800px; width: 95%;
+      background: white; padding: 20px; border-radius: 10px; max-width: 850px; width: 95%;
       box-shadow: 0 8px 25px rgba(0,0,0,0.25); max-height: 85vh; display: flex; flex-direction: column;
     }
     .modal-body-scroll { overflow-y: auto; flex: 1; margin-bottom: 12px; }
@@ -286,13 +288,24 @@
 
     <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
 
-    <h3>4. 時間割から一括生成</h3>
+    <h3>4. 時間割から一括生成（長期休暇・祝日除外対応）</h3>
     <div class="control-group">
       <label>対象期間:</label>
       <input type="date" id="gen-start">
       <span>〜</span>
       <input type="date" id="gen-end">
-      <button class="btn btn-success" onclick="generateLessonsFromTimetable()">時間割から一括作成する</button>
+    </div>
+    <div class="control-group">
+      <label>夏季休業:</label>
+      <input type="date" id="summer-start"> 〜 <input type="date" id="summer-end">
+    </div>
+    <div class="control-group">
+      <label>冬季休業:</label>
+      <input type="date" id="winter-start"> 〜 <input type="date" id="winter-end">
+    </div>
+    <div class="control-group">
+      <label><input type="checkbox" id="skip-holidays" checked> 日本の祝日（祝日法）を自動で省く</label>
+      <button class="btn btn-success" onclick="generateLessonsFromTimetable()" style="margin-left:auto;">時間割から一括作成する</button>
     </div>
 
     <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
@@ -314,7 +327,6 @@
 
   <script>
     let subjects = [], timetable = {}, lessons = [], attendanceData = {}, attendanceMemos = {}, attendanceDrawings = {};
-    // 科目ごとに生徒名簿を保持するオブジェクトに変更 (例: { "英語コミュニケーションⅠ": [...], "数学Ⅰ": [...] })
     let subjectStudents = {};
     
     try {
@@ -412,7 +424,7 @@
     }
 
     function deleteSubject(subjectName) {
-      if (confirm(`科目「${subjectName}」を削除しますか？（登録されている生徒名簿や授業データも削除されます）`)) {
+      if (confirm(`科目「${subjectName}」を削除しますか？`)) {
         subjects = subjects.filter(s => s !== subjectName);
         delete subjectStudents[subjectName];
         if (currentSubject === subjectName) currentSubject = subjects[0] || "";
@@ -455,7 +467,7 @@
       const importSelect = document.getElementById('import-subject-select');
       if (!subContainer || !importSelect) return;
 
-      let subHtml = subjects.length === 0 ? '<span style="color:#718096; font-size:0.8rem;">登録されている科目はありません。まずは上部で科目を登録してください。</span>' : '';
+      let subHtml = subjects.length === 0 ? '<span style="color:#718096; font-size:0.8rem;">登録されている科目はありません。</span>' : '';
       let selectHtml = '';
       
       subjects.forEach(sub => {
@@ -473,7 +485,7 @@
       const dateVal = document.getElementById('quick-date').value;
       const periodVal = document.getElementById('quick-period').value;
       if (!dateVal) { alert("日付を選択してください。"); return; }
-      if (!currentSubject) { alert("科目が選択されていません。「設定」画面から科目を登録してください。"); return; }
+      if (!currentSubject) { alert("科目が選択されていません。"); return; }
       const lessonKey = `${dateVal}_${periodVal}(${currentSubject})`;
       if (lessons.includes(lessonKey)) { alert("その授業日時はすでに存在します。"); return; }
       lessons.push(lessonKey);
@@ -493,7 +505,6 @@
       const index = lessons.indexOf(lessonKey);
       if (index !== -1) {
         lessons[index] = newKey;
-        // 該当科目の全生徒に対して attendanceData のキーを付け替え
         const targetStudents = subjectStudents[match[3]] || [];
         targetStudents.forEach(s => {
           if (attendanceData[`${s.id}_${lessonKey}`]) {
@@ -612,29 +623,88 @@
       delete attendanceDrawings[activeMemoLesson]; saveData();
     }
 
+    // --- ③ 日本の祝日判定ヘルパー ---
+    function isJapaneseHoliday(date) {
+      const y = date.getFullYear();
+      const m = date.getMonth() + 1;
+      const d = date.getDate();
+      const dow = date.getDay(); // 0:日, 1:月...
+
+      // 固定祝日
+      if ((m === 1 && d === 1) ||   // 元日
+          (m === 2 && d === 11) ||  // 建国記念の日
+          (m === 2 && d === 23) ||  // 天皇誕生日
+          (m === 4 && d === 29) ||  // 昭和の日
+          (m === 5 && d === 3) ||   // 憲法記念日
+          (m === 5 && d === 4) ||   // みどりの日
+          (m === 5 && d === 5) ||   // こどもの日
+          (m === 11 && d === 3) ||  // 文化の日
+          (m === 11 && d === 23))   // 勤労感謝の日
+        return true;
+
+      // 春分の日・秋分の日 (2026/2027年対応近似)
+      if (m === 3 && ((y === 2026 && d === 20) || (y === 2027 && d === 21))) return true;
+      if (m === 9 && ((y === 2026 && d === 23) || (y === 2027 && d === 23))) return true;
+
+      // ハッピーマンデー制度
+      // 成人の日: 1月 第2月曜日
+      if (m === 1 && dow === 1 && d >= 8 && d <= 14) return true;
+      // 海の日: 7月 第3月曜日
+      if (m === 7 && dow === 1 && d >= 15 && d <= 21) return true;
+      // 敬老の日: 9月 第3月曜日
+      if (m === 9 && dow === 1 && d >= 15 && d <= 21) return true;
+      // スポーツの日: 10月 第2月曜日
+      if (m === 10 && dow === 1 && d >= 8 && d <= 14) return true;
+
+      return false;
+    }
+
+    // ③ 長期休暇・祝日除外付きの一括生成
     function generateLessonsFromTimetable() {
       const startStr = document.getElementById('gen-start').value;
       const endStr = document.getElementById('gen-end').value;
       if (!startStr || !endStr) { alert("対象期間を指定してください。"); return; }
+
+      const summerStart = document.getElementById('summer-start').value;
+      const summerEnd = document.getElementById('summer-end').value;
+      const winterStart = document.getElementById('winter-start').value;
+      const winterEnd = document.getElementById('winter-end').value;
+      const skipHolidays = document.getElementById('skip-holidays').checked;
+
       let curr = new Date(startStr), end = new Date(endStr), addedCount = 0;
+
       while (curr <= end) {
-        const dow = curr.getDay();
+        const dow = curr.getDay(); // 0:日, 1:月... 6:土
+        const yyyy = curr.getFullYear();
+        const mm = String(curr.getMonth() + 1).padStart(2, '0');
+        const dd = String(curr.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        // 平日(月〜金: 1〜5)かつ祝日・休暇チェック
         if (dow >= 1 && dow <= 5) {
-          for (let period = 1; period <= 6; period++) {
-            const subName = timetable[`${dow}_${period}`];
-            if (subName) {
-              const yyyy = curr.getFullYear();
-              const mm = String(curr.getMonth() + 1).padStart(2, '0');
-              const dd = String(curr.getDate()).padStart(2, '0');
-              const lessonKey = `${yyyy}-${mm}-${dd}_${period}限(${subName})`;
-              if (!lessons.includes(lessonKey)) { lessons.push(lessonKey); addedCount++; }
+          let isExcluded = false;
+
+          // 夏季休業チェック
+          if (summerStart && summerEnd && dateStr >= summerStart && dateStr <= summerEnd) isExcluded = true;
+          // 冬季休業チェック
+          if (winterStart && winterEnd && dateStr >= winterStart && dateStr <= winterEnd) isExcluded = true;
+          // 祝日チェック
+          if (skipHolidays && isJapaneseHoliday(curr)) isExcluded = true;
+
+          if (!isExcluded) {
+            for (let period = 1; period <= 6; period++) {
+              const subName = timetable[`${dow}_${period}`];
+              if (subName) {
+                const lessonKey = `${dateStr}_${period}限(${subName})`;
+                if (!lessons.includes(lessonKey)) { lessons.push(lessonKey); addedCount++; }
+              }
             }
           }
         }
         curr.setDate(curr.getDate() + 1);
       }
       saveData();
-      alert(`${addedCount}件の授業日を一括生成しました！`);
+      alert(`${addedCount}件の授業日を一括生成しました（休暇・祝日除外適用）！`);
       switchMainTab('attendance');
     }
 
@@ -648,7 +718,7 @@
 
     function importCSV() {
       const targetSub = document.getElementById('import-subject-select').value;
-      if (!targetSub) { alert("対象とする科目を選択してください。（先に科目を登録してください）"); return; }
+      if (!targetSub) { alert("対象とする科目を選択してください。"); return; }
       const fileInput = document.getElementById('csv-file');
       if (!fileInput || !fileInput.files[0]) { alert("CSVファイルを選択してください。"); return; }
 
@@ -694,11 +764,13 @@
               <button class="th-action-btn" onclick="deleteLessonHeader('${lessonKey}')">削除</button>`;
     }
 
+    // ②「出停」のクラス判定を追加
     function getStatusClass(status) {
       if (status === "欠席") return "is-absent";
       if (status === "遅刻") return "is-late";
       if (status === "早退") return "is-early";
       if (status === "中抜け") return "is-middle";
+      if (status === "出停") return "is-suspended";
       return "is-present";
     }
 
@@ -713,11 +785,20 @@
       renderTable();
     }
 
-    function openSummaryModal(studentId, studentName) {
+    // ① 集計表示を押した日付（本日）時点までの授業に絞って集計
+    function getValidLessonsForSummary() {
       const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
-      let totalCounts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0 };
+      allSubjectLessons.sort();
+      const todayStr = new Date().toISOString().slice(0, 10);
+      // 日付が今日以前の授業のみをカウント対象にする
+      return allSubjectLessons.filter(l => l.split('_')[0] <= todayStr);
+    }
+
+    function openSummaryModal(studentId, studentName) {
+      const validLessons = getValidLessonsForSummary();
+      let totalCounts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0, "出停": 0 };
       
-      allSubjectLessons.forEach(lesson => {
+      validLessons.forEach(lesson => {
         const key = `${studentId}_${lesson}`;
         const st = attendanceData[key] || "出席";
         if (totalCounts[st] !== undefined) totalCounts[st]++;
@@ -726,12 +807,13 @@
       document.getElementById('summary-modal-title').innerText = `📊 ${studentName} さんの出席集計`;
       const body = document.getElementById('summary-modal-body');
       body.innerHTML = `
-        <div style="font-size:0.8rem; color:#718096; margin-bottom:10px;">対象科目: ${currentSubject} （全 ${allSubjectLessons.length} 回）</div>
+        <div style="font-size:0.8rem; color:#718096; margin-bottom:10px;">対象科目: ${currentSubject} （本日時点の集計対象: 全 ${validLessons.length} 回）</div>
         <div class="summary-list-item"><span>🟢 出席</span><strong>${totalCounts["出席"]} 回</strong></div>
         <div class="summary-list-item"><span>🔴 欠席</span><strong>${totalCounts["欠席"]} 回</strong></div>
         <div class="summary-list-item"><span>🟡 遅刻</span><strong>${totalCounts["遅刻"]} 回</strong></div>
         <div class="summary-list-item"><span>🟢 早退</span><strong>${totalCounts["早退"]} 回</strong></div>
         <div class="summary-list-item"><span>🔵 中抜け</span><strong>${totalCounts["中抜け"]} 回</strong></div>
+        <div class="summary-list-item"><span>🟣 出停</span><strong>${totalCounts["出停"]} 回</strong></div>
       `;
       document.getElementById('summary-modal').style.display = 'flex';
     }
@@ -740,26 +822,27 @@
       document.getElementById('summary-modal').style.display = 'none';
     }
 
+    // ① 全員分集計も本日時点までに絞る
     function openAllSummaryModal() {
-      const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
-      document.getElementById('all-summary-modal-title').innerText = `📊 【${currentSubject}】全員分の出席集計一覧（全 ${allSubjectLessons.length} 回）`;
+      const validLessons = getValidLessonsForSummary();
+      document.getElementById('all-summary-modal-title').innerText = `📊 【${currentSubject}】全員分の出席集計一覧（本日時点: 全 ${validLessons.length} 回）`;
       
       const body = document.getElementById('all-summary-modal-body');
       const targetStudents = subjectStudents[currentSubject] || [];
 
-      if (targetStudents.length === 0 || allSubjectLessons.length === 0) {
-        body.innerHTML = '<p style="text-align:center; color:#718096; padding:20px;">この科目の名簿または授業が登録されていません。</p>';
+      if (targetStudents.length === 0 || validLessons.length === 0) {
+        body.innerHTML = '<p style="text-align:center; color:#718096; padding:20px;">この科目の名簿または集計対象の授業が登録されていません。</p>';
         document.getElementById('all-summary-modal').style.display = 'flex';
         return;
       }
 
       let html = `<div class="table-container"><table><thead><tr>
-        <th>クラス/番号</th><th style="text-align:left;">氏名</th><th>出席</th><th>欠席</th><th>遅刻</th><th>早退</th><th>中抜け</th>
+        <th>クラス/番号</th><th style="text-align:left;">氏名</th><th>出席</th><th>欠席</th><th>遅刻</th><th>早退</th><th>中抜け</th><th>出停</th>
       </tr></thead><tbody>`;
 
       targetStudents.forEach(student => {
-        let counts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0 };
-        allSubjectLessons.forEach(lesson => {
+        let counts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0, "出停": 0 };
+        validLessons.forEach(lesson => {
           const st = attendanceData[`${student.id}_${lesson}`] || "出席";
           if (counts[st] !== undefined) counts[st]++;
         });
@@ -773,6 +856,7 @@
           <td style="${counts["遅刻"] > 0 ? 'color:#9c4221; font-weight:bold;' : ''}">${counts["遅刻"]}</td>
           <td>${counts["早退"]}</td>
           <td>${counts["中抜け"]}</td>
+          <td style="${counts["出停"] > 0 ? 'color:#553c9a; font-weight:bold;' : ''}">${counts["出停"]}</td>
         </tr>`;
       });
 
@@ -863,6 +947,7 @@
         displayLessons.forEach(lesson => {
           const key = `${student.id}_${lesson}`;
           const currentStatus = attendanceData[key] || "出席";
+          // ② 出席ステータスの選択肢に「出停」を追加
           wrapperHtml += `<td>
             <select class="status-select ${getStatusClass(currentStatus)}" onchange="changeStatus(${student.id}, '${lesson}', this.value)">
               <option value="出席" ${currentStatus === "出席" ? "selected" : ""}>-</option>
@@ -870,6 +955,7 @@
               <option value="遅刻" ${currentStatus === "遅刻" ? "selected" : ""}>遅刻</option>
               <option value="早退" ${currentStatus === "早退" ? "selected" : ""}>早退</option>
               <option value="中抜け" ${currentStatus === "中抜け" ? "selected" : ""}>中抜け</option>
+              <option value="出停" ${currentStatus === "出停" ? "selected" : ""}>出停</option>
             </select>
           </td>`;
         });
