@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="マイ出席簿">
+  <title>マイ出席簿システム</title>
+  <style>
+    :root {
+      --primary-color: #2c3e50;
+      --accent-color: #3498db;
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: 12px;
+      background: var(--bg-color);
+      color: #2d3748;
+      margin: 0;
+    }
+    
+    h1 { font-size: 1.2rem; margin: 0 0 2px 0; color: var(--primary-color); }
+    p.sub { font-size: 0.8rem; color: #718096; margin: 0 0 12px 0; }
+    
+    .navbar {
+      display: flex;
+      gap: 6px;
+      background: #edf2f7;
+      padding: 4px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+    .main-tab-btn {
+      flex: 1;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      border: none;
+      background: transparent;
+      color: #4a5568;
+      cursor: pointer;
+      border-radius: 6px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .main-tab-btn.active {
+      background: var(--card-bg);
+      color: var(--accent-color);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    .subject-tab-container { margin-bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .sub-tab-btn {
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      border: 1px solid #cbd5e0;
+      background: var(--card-bg);
+      color: #4a5568;
+      cursor: pointer;
+      border-radius: 16px;
+      font-weight: 600;
+    }
+    .sub-tab-btn.active {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
+    }
+
+    .panel { display: none; background: var(--card-bg); padding: 14px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.04); margin-bottom: 16px; }
+    .panel.active { display: block; }
+
+    .control-group { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    label { font-size: 0.8rem; font-weight: 600; color: #4a5568; }
+    input, select, textarea { padding: 6px 8px; font-size: 0.85rem; border: 1px solid #cbd5e0; border-radius: 6px; background: #fff; }
+    
+    .btn { border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+    .btn-primary { background: var(--accent-color); color: white; }
+    .btn-success { background: #48bb78; color: white; }
+    .btn-danger { background: #f56565; color: white; }
+    .btn-print { background: #4299e1; color: white; }
+    .btn-secondary { background: #a0aec0; color: white; }
+    .btn-info { background: #319795; color: white; }
+
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; background: #edf2f7; padding: 6px 12px; border-radius: 6px; margin-bottom: 10px; }
+    .page-info { font-weight: 600; font-size: 0.8rem; color: #4a5568; }
+
+    .timetable-grid { width: 100%; border-collapse: collapse; text-align: center; margin-bottom: 12px; table-layout: fixed; }
+    .timetable-grid th, .timetable-grid td { border: 1px solid #e2e8f0; padding: 6px; font-size: 0.8rem; overflow: hidden; }
+    .timetable-grid th:first-child, .timetable-grid td:first-child { width: 60px; }
+    .timetable-grid th:not(:first-child), .timetable-grid td:not(:first-child) { width: auto; }
+    .timetable-grid th { background: #2d3748; color: white; }
+    .timetable-select { width: 100%; padding: 4px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e0; box-sizing: border-box; }
+
+    .table-container { margin-bottom: 12px; background: white; border-radius: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed; }
+    th, td { border: 1px solid #e2e8f0; padding: 4px 6px; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
+    
+    th:nth-child(1), td:nth-child(1) { width: 55px; }
+    th:nth-child(2), td:nth-child(2) { width: 110px; }
+    th:nth-last-child(1), td:nth-last-child(1) { width: 60px; }
+
+    th { background: #2d3748; color: white; vertical-align: middle; }
+    td.student-info { text-align: center; white-space: nowrap; font-size: 0.75rem; color: #718096; }
+    td.name { text-align: left; font-weight: 600; white-space: nowrap; }
+    
+    .status-select {
+      width: 100%; padding: 4px 2px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e0; cursor: pointer; text-align-last: center; font-weight: 600; box-sizing: border-box;
+    }
+    .status-select.is-present { background: #ffffff; color: #a0aec0; border-color: #e2e8f0; }
+    .status-select.is-absent  { background: #fed7d7; color: #9b2c2c; border-color: #feb2b2; }
+    .status-select.is-late    { background: #feebc8; color: #9c4221; border-color: #fbd38d; }
+    .status-select.is-early   { background: #c6f6d5; color: #22543d; border-color: #9ae6b4; }
+    .status-select.is-middle  { background: #bee3f8; color: #2c5282; border-color: #90cdf4; }
+
+    .active-memo-container { background: #fffff0; border: 1px solid #f6e05e; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+    .active-memo-container h3 { margin: 0 0 6px 0; font-size: 0.9rem; color: #d69e2e; display: flex; justify-content: space-between; align-items: center; }
+    .active-memo-textarea { width: 100%; height: 50px; padding: 6px; font-size: 0.85rem; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; resize: vertical; margin-bottom: 6px; }
+    .memo-canvas-wrapper { background: white; border: 1px solid #cbd5e0; border-radius: 6px; position: relative; overflow: hidden; touch-action: none; }
+    .memo-canvas { display: block; width: 100%; height: 150px; cursor: crosshair; }
+    .canvas-tools { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
+
+    .simple-list { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .tag-item { background: #edf2f7; padding: 4px 8px; border-radius: 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+
+    .th-action-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 1px 4px; font-size: 0.65rem; border-radius: 3px; cursor: pointer; margin-top: 2px; }
+    .th-memo-btn { background: #ecc94b; border: 1px solid #d69e2e; color: #744210; font-weight: bold; padding: 1px 4px; font-size: 0.65rem; border-radius: 3px; cursor: pointer; margin-top: 2px; }
+    .th-memo-btn.active-memo { background: #dd6b20; color: white; }
+
+    /* モーダル共通 */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4); z-index: 1000; justify-content: center; align-items: center;
+    }
+    .modal-content {
+      background: white; padding: 16px; border-radius: 10px; max-width: 450px; width: 90%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; }
+    .modal-title { font-weight: bold; font-size: 1rem; color: #2d3748; }
+    .summary-list-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.85rem; }
+
+    /* 全員集計モーダル用特大サイズ */
+    .modal-content-large {
+      background: white; padding: 20px; border-radius: 10px; max-width: 800px; width: 95%;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.25); max-height: 85vh; display: flex; flex-direction: column;
+    }
+    .modal-body-scroll { overflow-y: auto; flex: 1; margin-bottom: 12px; }
+
+    @media print {
+      @page { size: A4 landscape; margin: 6mm; }
+      body { background: white; padding: 0; color: black; }
+      h1 { font-size: 1rem; text-align: left; margin-bottom: 2px; }
+      .sub, .navbar, .subject-tab-container, .no-print, .th-action-btn, .th-memo-btn, .pagination-bar { display: none !important; }
+      .panel { display: none !important; }
+      .panel.active { display: block !important; box-shadow: none; padding: 0; margin: 0; }
+      .table-container { box-shadow: none; padding: 0; }
+      table { border: 1.5px solid #000; width: 100%; table-layout: auto; }
+      th, td { border: 1px solid #000 !important; color: black !important; font-size: 0.7rem; padding: 3px; }
+      th { background: #eee !important; color: black !important; }
+      
+      /* 印刷時に全員集計モーダルの中身を展開して綺麗に印刷させる設定 */
+      .modal-overlay { display: block !important; position: static !important; background: none !important; width: 100% !important; height: auto !important; }
+      .modal-content-large { max-width: 100% !important; width: 100% !important; box-shadow: none !important; padding: 0 !important; max-height: none !important; }
+      .modal-header, .modal-body-scroll { display: block !important; overflow: visible !important; }
+      .modal-header button { display: none !important; }
+      #panel-attendance { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>マイ出席簿システム</h1>
+  <p class="sub">科目・クラスごとに切り替えて記録・印刷が行えます。</p>
+
+  <div class="navbar no-print">
+    <button class="main-tab-btn active" onclick="switchMainTab('attendance')">📚 出席簿・記録</button>
+    <button class="main-tab-btn" onclick="switchMainTab('settings')">⚙️ 名簿・時間割設定</button>
+  </div>
+
+  <!-- 【タブ1】出席簿・記録画面 -->
+  <div id="panel-attendance" class="panel active">
+    
+    <div id="subject-tabs" class="subject-tab-container no-print"></div>
+
+    <div class="no-print" style="margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:#edf2f7; padding:8px; border-radius:6px;">
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <label>授業日追加:</label>
+        <input type="date" id="quick-date">
+        <select id="quick-period">
+          <option value="1限">1限</option><option value="2限">2限</option><option value="3限" selected>3限</option><option value="4限">4限</option><option value="5限">5限</option><option value="6限">6限</option>
+        </select>
+        <button class="btn btn-primary" onclick="addQuickLesson()">追加</button>
+      </div>
+
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-info" onclick="openAllSummaryModal()">📊 全員分の集計一覧</button>
+        <button class="btn btn-print" onclick="window.print()">🖨️ 印刷・PDF保存</button>
+      </div>
+    </div>
+
+    <div id="pagination-bar-top" class="pagination-bar no-print"></div>
+
+    <div id="active-memo-area" style="display:none;" class="active-memo-container">
+      <h3 id="active-memo-title">📝 授業メモ [ - ] <button class="btn" style="padding:2px 6px; font-size:0.7rem; background:#cbd5e0; cursor:pointer;" onclick="closeMemo()">閉じる</button></h3>
+      <textarea id="active-memo-textarea" class="active-memo-textarea" placeholder="この日の授業内容や連絡事項を入力..." oninput="saveActiveMemoText(this.value)"></textarea>
+      <div class="memo-canvas-wrapper">
+        <canvas id="memo-canvas" class="memo-canvas"></canvas>
+      </div>
+      <div class="canvas-tools no-print">
+        <button class="btn btn-secondary" style="padding:3px 8px; font-size:0.7rem;" onclick="clearCanvas()">手書きをクリア</button>
+      </div>
+    </div>
+
+    <div id="print-title" style="display:none; font-size:0.95rem; font-weight:bold; margin-bottom:4px;"></div>
+
+    <div id="attendance-tables-wrapper"></div>
+
+    <div id="pagination-bar-bottom" class="pagination-bar no-print"></div>
+  </div>
+
+  <!-- 個別生徒用 集計ポップアップ -->
+  <div id="summary-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title" id="summary-modal-title">生徒名 - 出席集計</div>
+        <button class="btn btn-secondary" style="padding:2px 6px;" onclick="closeSummaryModal()">✕</button>
+      </div>
+      <div id="summary-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 全員分集計一覧ポップアップ（印刷対応） -->
+  <div id="all-summary-modal" class="modal-overlay">
+    <div class="modal-content-large">
+      <div class="modal-header">
+        <div class="modal-title" id="all-summary-modal-title">📊 クラス全員分の出席集計一覧</div>
+        <div style="display:flex; gap:6px;" class="no-print">
+          <button class="btn btn-print" onclick="window.print()">🖨️ この一覧を印刷</button>
+          <button class="btn btn-secondary" style="padding:2px 6px;" onclick="closeAllSummaryModal()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body-scroll" id="all-summary-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 【タブ2】設定画面 -->
+  <div id="panel-settings" class="panel no-print">
+    <h3>1. 生徒名簿の設定</h3>
+    <div class="control-group">
+      <button class="btn btn-success" onclick="downloadCSVTemplate()">名簿CSVテンプレートをダウンロード</button>
+    </div>
+    <div class="control-group">
+      <label>CSVファイルを選択:</label>
+      <input type="file" id="csv-file" accept=".csv, .txt">
+      <button class="btn btn-primary" onclick="importCSV()">名簿を読み込む</button>
+    </div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>2. 担当科目の登録</h3>
+    <div class="control-group">
+      <input type="text" id="new-subject-name" placeholder="科目名 (例: 英語コミュニケーションⅠ)">
+      <button class="btn btn-primary" onclick="addSubject()">科目を追加</button>
+    </div>
+    <div id="subject-list" class="simple-list"></div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>3. 週の時間割設定</h3>
+    <table class="timetable-grid">
+      <thead>
+        <tr>
+          <th>時限</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th>
+        </tr>
+      </thead>
+      <tbody id="timetable-tbody"></tbody>
+    </table>
+    <div class="control-group">
+      <button class="btn btn-success" onclick="saveTimetable()">時間割を保存する</button>
+    </div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>4. 時間割から一括生成</h3>
+    <div class="control-group">
+      <label>対象期間:</label>
+      <input type="date" id="gen-start">
+      <span>〜</span>
+      <input type="date" id="gen-end">
+      <button class="btn btn-success" onclick="generateLessonsFromTimetable()">時間割から一括作成する</button>
+    </div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>5. バックアップと復元</h3>
+    <div class="control-group">
+      <button class="btn btn-secondary" onclick="exportBackup()">💾 バックアップ保存</button>
+    </div>
+    <div class="control-group">
+      <label>復元ファイル:</label>
+      <input type="file" id="backup-file" accept=".json">
+      <button class="btn btn-info" onclick="importBackup()">📂 復元実行</button>
+    </div>
+
+    <div style="margin-top: 30px; text-align: right;">
+      <button class="btn btn-danger" onclick="resetData()">全データを初期化する</button>
+    </div>
+  </div>
+
+  <script>
+    let students = [], subjects = [], timetable = {}, lessons = [], attendanceData = {}, attendanceMemos = {}, attendanceDrawings = {};
+    
+    try {
+      students = JSON.parse(localStorage.getItem('attendance_students')) || [];
+      subjects = JSON.parse(localStorage.getItem('attendance_subjects')) || [];
+      timetable = JSON.parse(localStorage.getItem('attendance_timetable')) || {};
+      lessons = JSON.parse(localStorage.getItem('attendance_lessons')) || [];
+      attendanceData = JSON.parse(localStorage.getItem('attendance_data')) || {};
+      attendanceMemos = JSON.parse(localStorage.getItem('attendance_memos')) || {};
+      attendanceDrawings = JSON.parse(localStorage.getItem('attendance_drawings')) || {};
+    } catch (e) {
+      students = []; subjects = []; timetable = {}; lessons = []; attendanceData = {}; attendanceMemos = {}; attendanceDrawings = {};
+    }
+    
+    let currentSubject = subjects[0] || "";
+    let activeMemoLesson = null;
+    let currentLessonPage = 1;
+    let canvas = null, ctx = null;
+    let isDrawing = false;
+
+    const dayOfWeekStr = ["日", "月", "火", "水", "木", "金", "土"];
+
+    function saveData() {
+      try {
+        localStorage.setItem('attendance_students', JSON.stringify(students));
+        localStorage.setItem('attendance_subjects', JSON.stringify(subjects));
+        localStorage.setItem('attendance_timetable', JSON.stringify(timetable));
+        localStorage.setItem('attendance_lessons', JSON.stringify(lessons));
+        localStorage.setItem('attendance_data', JSON.stringify(attendanceData));
+        localStorage.setItem('attendance_memos', JSON.stringify(attendanceMemos));
+        localStorage.setItem('attendance_drawings', JSON.stringify(attendanceDrawings));
+      } catch (e) {}
+    }
+
+    function exportBackup() {
+      const backupData = { students, subjects, timetable, lessons, attendanceData, attendanceMemos, attendanceDrawings, exportedAt: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `attendance_backup_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    function importBackup() {
+      const fileInput = document.getElementById('backup-file');
+      if (!fileInput || !fileInput.files[0]) { alert("JSONファイルを選択してください。"); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (confirm("現在のデータを上書きして復元しますか？")) {
+            students = data.students || []; subjects = data.subjects || []; timetable = data.timetable || {};
+            lessons = data.lessons || []; attendanceData = data.attendanceData || {};
+            attendanceMemos = data.attendanceMemos || {}; attendanceDrawings = data.attendanceDrawings || {};
+            saveData(); alert("復元が完了しました！"); location.reload();
+          }
+        } catch (err) { alert("ファイル形式が正しくありません。"); }
+      };
+      reader.readAsText(fileInput.files[0], "UTF-8");
+    }
+
+    function switchMainTab(tabName) {
+      document.querySelectorAll('.main-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+      if (tabName === 'attendance') {
+        document.querySelectorAll('.main-tab-btn')[0].classList.add('active');
+        document.getElementById('panel-attendance').classList.add('active');
+        renderTable();
+      } else {
+        document.querySelectorAll('.main-tab-btn')[1].classList.add('active');
+        document.getElementById('panel-settings').classList.add('active');
+        renderSettingsUI();
+      }
+    }
+
+    function selectSubject(sub) {
+      currentSubject = sub;
+      activeMemoLesson = null;
+      currentLessonPage = 1;
+      renderTable();
+    }
+
+    function addSubject() {
+      const input = document.getElementById('new-subject-name');
+      const val = input ? input.value.trim() : "";
+      if (!val) { alert("科目名を入力してください。"); return; }
+      if (subjects.includes(val)) { alert("すでに登録されています。"); return; }
+      subjects.push(val);
+      if (!currentSubject) currentSubject = val;
+      input.value = "";
+      saveData();
+      renderSettingsUI();
+    }
+
+    function deleteSubject(subjectName) {
+      if (confirm(`科目「${subjectName}」を削除しますか？`)) {
+        subjects = subjects.filter(s => s !== subjectName);
+        if (currentSubject === subjectName) currentSubject = subjects[0] || "";
+        saveData();
+        renderSettingsUI();
+      }
+    }
+
+    function renderTimetableGrid() {
+      const tbody = document.getElementById('timetable-tbody');
+      if (!tbody) return;
+      let html = '';
+      for (let period = 1; period <= 6; period++) {
+        html += `<tr><td><strong>${period}限</strong></td>`;
+        for (let d = 1; d <= 5; d++) {
+          const key = `${d}_${period}`;
+          const currentSub = timetable[key] || "";
+          html += `<td><select class="timetable-select" data-key="${key}"><option value="">(なし)</option>`;
+          subjects.forEach(sub => {
+            html += `<option value="${sub}" ${currentSub === sub ? "selected" : ""}>${sub}</option>`;
+          });
+          html += `</select></td>`;
+        }
+        html += `</tr>`;
+      }
+      tbody.innerHTML = html;
+    }
+
+    function saveTimetable() {
+      document.querySelectorAll('.timetable-select').forEach(sel => {
+        const key = sel.getAttribute('data-key');
+        if (sel.value) { timetable[key] = sel.value; } else { delete timetable[key]; }
+      });
+      saveData();
+      alert("時間割を保存しました！");
+    }
+
+    function renderSettingsUI() {
+      const subContainer = document.getElementById('subject-list');
+      if (!subContainer) return;
+      let subHtml = subjects.length === 0 ? '<span style="color:#718096; font-size:0.8rem;">登録されている科目はありません。</span>' : '';
+      subjects.forEach(sub => {
+        subHtml += `<div class="tag-item">${sub} <button type="button" class="btn btn-danger" style="padding:1px 4px; font-size:0.6rem;" onclick="deleteSubject('${sub}')">×</button></div>`;
+      });
+      subContainer.innerHTML = subHtml;
+      renderTimetableGrid();
+    }
+
+    function addQuickLesson() {
+      const dateVal = document.getElementById('quick-date').value;
+      const periodVal = document.getElementById('quick-period').value;
+      if (!dateVal) { alert("日付を選択してください。"); return; }
+      if (!currentSubject) { alert("科目が選択されていません。「設定」画面から科目を登録してください。"); return; }
+      const lessonKey = `${dateVal}_${periodVal}(${currentSubject})`;
+      if (lessons.includes(lessonKey)) { alert("その授業日時はすでに存在します。"); return; }
+      lessons.push(lessonKey);
+      saveData();
+      renderTable();
+    }
+
+    function editLessonHeader(lessonKey) {
+      const match = lessonKey.match(/^(.+?)_(.+?)\((.*?)\)$/);
+      if (!match) return;
+      const newDate = prompt("日付を YYYY-MM-DD 形式で入力:", match[1]);
+      if (!newDate) return;
+      const newPeriod = prompt("時限を入力:", match[2]);
+      if (!newPeriod) return;
+      const newKey = `${newDate}_${newPeriod}(${match[3]})`;
+      if (lessons.includes(newKey)) { alert("すでに同じ日程が存在します。"); return; }
+      const index = lessons.indexOf(lessonKey);
+      if (index !== -1) {
+        lessons[index] = newKey;
+        students.forEach(s => {
+          if (attendanceData[`${s.id}_${lessonKey}`]) {
+            attendanceData[`${s.id}_${newKey}`] = attendanceData[`${s.id}_${lessonKey}`];
+            delete attendanceData[`${s.id}_${lessonKey}`];
+          }
+        });
+        if (attendanceMemos[lessonKey]) { attendanceMemos[newKey] = attendanceMemos[lessonKey]; delete attendanceMemos[lessonKey]; }
+        if (attendanceDrawings[lessonKey]) { attendanceDrawings[newKey] = attendanceDrawings[lessonKey]; delete attendanceDrawings[lessonKey]; }
+        if (activeMemoLesson === lessonKey) activeMemoLesson = newKey;
+        saveData();
+        renderTable();
+      }
+    }
+
+    function deleteLessonHeader(lessonKey) {
+      if (confirm(`この授業を削除しますか？`)) {
+        lessons = lessons.filter(l => l !== lessonKey);
+        students.forEach(s => delete attendanceData[`${s.id}_${lessonKey}`]);
+        delete attendanceMemos[lessonKey];
+        delete attendanceDrawings[lessonKey];
+        if (activeMemoLesson === lessonKey) closeMemo();
+        saveData();
+        renderTable();
+      }
+    }
+
+    function toggleMemo(lessonKey) {
+      if (activeMemoLesson === lessonKey) { closeMemo(); } else { activeMemoLesson = lessonKey; renderMemoArea(); renderTable(); }
+    }
+
+    function closeMemo() {
+      activeMemoLesson = null;
+      const area = document.getElementById('active-memo-area');
+      if (area) area.style.display = 'none';
+      renderTable();
+    }
+
+    function renderMemoArea() {
+      if (!activeMemoLesson) return;
+      const area = document.getElementById('active-memo-area');
+      const titleEl = document.getElementById('active-memo-title');
+      const textarea = document.getElementById('active-memo-textarea');
+      if (!area || !titleEl || !textarea) return;
+
+      const parts = activeMemoLesson.split('_');
+      const dateObj = new Date(parts[0]);
+      const dayStr = dayOfWeekStr[dateObj.getDay()];
+      const periodOnly = parts[1].replace(/\(.*\)/, '');
+      const dateLabel = `${dateObj.getMonth() + 1}/${dateObj.getDate()} (${dayStr}) ${periodOnly}`;
+
+      titleEl.innerHTML = `📝 授業メモ [ ${dateLabel} ] <button class="btn" style="padding:2px 6px; font-size:0.7rem; background:#cbd5e0; cursor:pointer;" onclick="closeMemo()">閉じる</button>`;
+      textarea.value = attendanceMemos[activeMemoLesson] || "";
+      area.style.display = 'block';
+      setTimeout(initCanvas, 50);
+    }
+
+    function saveActiveMemoText(text) {
+      if (!activeMemoLesson) return;
+      if (text.trim() === "") { delete attendanceMemos[activeMemoLesson]; } else { attendanceMemos[activeMemoLesson] = text; }
+      saveData();
+    }
+
+    function initCanvas() {
+      canvas = document.getElementById('memo-canvas');
+      if (!canvas) return;
+      ctx = canvas.getContext('2d');
+      canvas.width = canvas.parentElement ? canvas.parentElement.clientWidth : 300;
+      canvas.height = 150;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (attendanceDrawings[activeMemoLesson]) {
+        const img = new Image();
+        img.onload = function() { if (ctx) ctx.drawImage(img, 0, 0); };
+        img.src = attendanceDrawings[activeMemoLesson];
+      }
+      canvas.onmousedown = startDrawing; canvas.onmousemove = draw; canvas.onmouseup = stopDrawing; canvas.onmouseleave = stopDrawing;
+      canvas.ontouchstart = startDrawing; canvas.ontouchmove = draw; canvas.ontouchend = stopDrawing;
+    }
+
+    function getPosition(e) {
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      let clientX = e.clientX, clientY = e.clientY;
+      if (e.touches && e.touches[0]) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function startDrawing(e) {
+      isDrawing = true;
+      const pos = getPosition(e);
+      if (ctx) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function draw(e) {
+      if (!isDrawing || !ctx) return;
+      const pos = getPosition(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.strokeStyle = "#000000"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke();
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function stopDrawing() {
+      if (!isDrawing) return;
+      isDrawing = false;
+      if (activeMemoLesson && canvas) { attendanceDrawings[activeMemoLesson] = canvas.toDataURL(); saveData(); }
+    }
+
+    function clearCanvas() {
+      if (!activeMemoLesson || !ctx || !canvas) return;
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      delete attendanceDrawings[activeMemoLesson]; saveData();
+    }
+
+    function generateLessonsFromTimetable() {
+      const startStr = document.getElementById('gen-start').value;
+      const endStr = document.getElementById('gen-end').value;
+      if (!startStr || !endStr) { alert("対象期間を指定してください。"); return; }
+      let curr = new Date(startStr), end = new Date(endStr), addedCount = 0;
+      while (curr <= end) {
+        const dow = curr.getDay();
+        if (dow >= 1 && dow <= 5) {
+          for (let period = 1; period <= 6; period++) {
+            const subName = timetable[`${dow}_${period}`];
+            if (subName) {
+              const yyyy = curr.getFullYear();
+              const mm = String(curr.getMonth() + 1).padStart(2, '0');
+              const dd = String(curr.getDate()).padStart(2, '0');
+              const lessonKey = `${yyyy}-${mm}-${dd}_${period}限(${subName})`;
+              if (!lessons.includes(lessonKey)) { lessons.push(lessonKey); addedCount++; }
+            }
+          }
+        }
+        curr.setDate(curr.getDate() + 1);
+      }
+      saveData();
+      alert(`${addedCount}件の授業日を一括生成しました！`);
+      switchMainTab('attendance');
+    }
+
+    function downloadCSVTemplate() {
+      const blob = new Blob(["\uFEFFクラス,出席番号,氏名\n1A,1,山田 太郎\n1A,2,佐藤 花子\n1B,1,鈴木 一郎\n"], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = "meibo_template.csv";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    function importCSV() {
+      const fileInput = document.getElementById('csv-file');
+      if (!fileInput || !fileInput.files[0]) { alert("CSVファイルを選択してください。"); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const lines = e.target.result.split(/\r\n|\n/);
+        const newStudents = [];
+        lines.forEach((line, index) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          const cols = trimmed.split(/,|\t/);
+          if (cols.length >= 3) {
+            if (index === 0 && (cols[0].includes("クラス") || cols[2].includes("氏名"))) return;
+            newStudents.push({ id: newStudents.length + 1, className: cols[0].trim(), number: parseInt(cols[1].trim()) || (newStudents.length + 1), name: cols[2].trim() });
+          }
+        });
+        if (newStudents.length > 0 && confirm(`${newStudents.length}名の名簿を読み込みます。上書きしてよろしいですか？`)) {
+          students = newStudents; saveData(); alert("名簿をインポートしました！"); fileInput.value = ""; renderTable();
+        }
+      };
+      reader.readAsText(fileInput.files[0], "UTF-8");
+    }
+
+    function formatLessonHeader(lessonKey) {
+      const parts = lessonKey.split('_');
+      const dateObj = new Date(parts[0]);
+      const dayStr = dayOfWeekStr[dateObj.getDay()];
+      const periodOnly = parts[1].replace(/\(.*\)/, '');
+
+      const hasText = attendanceMemos[lessonKey] && attendanceMemos[lessonKey].trim() !== "";
+      const hasDraw = attendanceDrawings[lessonKey];
+      const memoBtnClass = (activeMemoLesson === lessonKey) ? "th-memo-btn active-memo" : "th-memo-btn";
+      const memoLabel = (hasText || hasDraw) ? "📝メモ(有)" : "📝メモ";
+
+      return `${dateObj.getMonth() + 1}/${dateObj.getDate()} <span style="font-size:0.7rem; font-weight:normal;">(${dayStr})</span><br>
+              <span style="font-size:0.7rem; font-weight:normal; color:#cbd5e0;">${periodOnly}</span><br>
+              <button class="${memoBtnClass}" onclick="toggleMemo('${lessonKey}')">${memoLabel}</button><br>
+              <button class="th-action-btn" onclick="editLessonHeader('${lessonKey}')">変更</button>
+              <button class="th-action-btn" onclick="deleteLessonHeader('${lessonKey}')">削除</button>`;
+    }
+
+    function getStatusClass(status) {
+      if (status === "欠席") return "is-absent";
+      if (status === "遅刻") return "is-late";
+      if (status === "早退") return "is-early";
+      if (status === "中抜け") return "is-middle";
+      return "is-present";
+    }
+
+    function changeStatus(studentId, lesson, status) {
+      attendanceData[`${studentId}_${lesson}`] = status;
+      saveData();
+      renderTable();
+    }
+
+    function changeLessonPage(targetPage) {
+      currentLessonPage = targetPage;
+      renderTable();
+    }
+
+    function openSummaryModal(studentId, studentName) {
+      const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
+      let totalCounts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0 };
+      
+      allSubjectLessons.forEach(lesson => {
+        const key = `${studentId}_${lesson}`;
+        const st = attendanceData[key] || "出席";
+        if (totalCounts[st] !== undefined) totalCounts[st]++;
+      });
+
+      document.getElementById('summary-modal-title').innerText = `📊 ${studentName} さんの出席集計`;
+      const body = document.getElementById('summary-modal-body');
+      body.innerHTML = `
+        <div style="font-size:0.8rem; color:#718096; margin-bottom:10px;">対象科目: ${currentSubject} （全 ${allSubjectLessons.length} 回）</div>
+        <div class="summary-list-item"><span>🟢 出席</span><strong>${totalCounts["出席"]} 回</strong></div>
+        <div class="summary-list-item"><span>🔴 欠席</span><strong>${totalCounts["欠席"]} 回</strong></div>
+        <div class="summary-list-item"><span>🟡 遅刻</span><strong>${totalCounts["遅刻"]} 回</strong></div>
+        <div class="summary-list-item"><span>🟢 早退</span><strong>${totalCounts["早退"]} 回</strong></div>
+        <div class="summary-list-item"><span>🔵 中抜け</span><strong>${totalCounts["中抜け"]} 回</strong></div>
+      `;
+      document.getElementById('summary-modal').style.display = 'flex';
+    }
+
+    function closeSummaryModal() {
+      document.getElementById('summary-modal').style.display = 'none';
+    }
+
+    // 全員分の集計モーダルを開く
+    function openAllSummaryModal() {
+      const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
+      document.getElementById('all-summary-modal-title').innerText = `📊 【${currentSubject}】全員分の出席集計一覧（全 ${allSubjectLessons.length} 回）`;
+      
+      const body = document.getElementById('all-summary-modal-body');
+      if (students.length === 0 || allSubjectLessons.length === 0) {
+        body.innerHTML = '<p style="text-align:center; color:#718096; padding:20px;">名簿または授業が登録されていません。</p>';
+        document.getElementById('all-summary-modal').style.display = 'flex';
+        return;
+      }
+
+      let html = `<div class="table-container"><table><thead><tr>
+        <th>クラス/番号</th><th style="text-align:left;">氏名</th><th>出席</th><th>欠席</th><th>遅刻</th><th>早退</th><th>中抜け</th>
+      </tr></thead><tbody>`;
+
+      students.forEach(student => {
+        let counts = { "出席": 0, "欠席": 0, "遅刻": 0, "早退": 0, "中抜け": 0 };
+        allSubjectLessons.forEach(lesson => {
+          const st = attendanceData[`${student.id}_${lesson}`] || "出席";
+          if (counts[st] !== undefined) counts[st]++;
+        });
+
+        const displayId = student.className ? `${student.className}-${student.number}` : student.number || student.id;
+        html += `<tr>
+          <td style="color:#718096; font-size:0.8rem;">${displayId}</td>
+          <td style="text-align:left; font-weight:600;">${student.name}</td>
+          <td>${counts["出席"]}</td>
+          <td style="${counts["欠席"] > 0 ? 'color:#9b2c2c; font-weight:bold;' : ''}">${counts["欠席"]}</td>
+          <td style="${counts["遅刻"] > 0 ? 'color:#9c4221; font-weight:bold;' : ''}">${counts["遅刻"]}</td>
+          <td>${counts["早退"]}</td>
+          <td>${counts["中抜け"]}</td>
+        </tr>`;
+      });
+
+      html += `</tbody></table></div>`;
+      body.innerHTML = html;
+      document.getElementById('all-summary-modal').style.display = 'flex';
+    }
+
+    function closeAllSummaryModal() {
+      document.getElementById('all-summary-modal').style.display = 'none';
+    }
+
+    function renderTable() {
+      const tabsContainer = document.getElementById('subject-tabs');
+      if (!tabsContainer) return;
+      let tabsHtml = '';
+      
+      if (subjects.length === 0) {
+        tabsContainer.innerHTML = '<span style="color:#e53e3e; font-size:0.85rem; font-weight:bold;">※「⚙️ 設定」画面から担当科目を登録し、生徒名簿をインポートしてください。</span>';
+        document.getElementById('attendance-tables-wrapper').innerHTML = '<p style="color:#718096; padding:15px; text-align:center;">科目や名簿が登録されていません。</p>';
+        document.getElementById('pagination-bar-top').innerHTML = '';
+        document.getElementById('pagination-bar-bottom').innerHTML = '';
+        return;
+      }
+
+      if (!currentSubject || !subjects.includes(currentSubject)) currentSubject = subjects[0];
+
+      subjects.forEach(sub => {
+        tabsHtml += `<button class="sub-tab-btn ${sub === currentSubject ? 'active' : ''}" onclick="selectSubject('${sub}')">${sub}</button>`;
+      });
+      tabsContainer.innerHTML = tabsHtml;
+
+      const printTitle = document.getElementById('print-title');
+      if (printTitle) printTitle.innerText = `【科目: ${currentSubject} 出席簿】`;
+
+      let allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
+      allSubjectLessons.sort();
+
+      if (activeMemoLesson && !allSubjectLessons.includes(activeMemoLesson)) closeMemo();
+      else if (activeMemoLesson) renderMemoArea();
+
+      const wrapper = document.getElementById('attendance-tables-wrapper');
+      if (allSubjectLessons.length === 0 || students.length === 0) {
+        wrapper.innerHTML = '<p style="color:#718096; padding:15px; text-align:center;">この科目の授業日、または生徒名簿が登録されていません。</p>';
+        document.getElementById('pagination-bar-top').innerHTML = '';
+        document.getElementById('pagination-bar-bottom').innerHTML = '';
+        return;
+      }
+
+      const pageSize = 10;
+      let totalLessonPages = Math.ceil(allSubjectLessons.length / pageSize) || 1;
+      if (currentLessonPage > totalLessonPages) currentLessonPage = totalLessonPages;
+      if (currentLessonPage < 1) currentLessonPage = 1;
+
+      const startIndex = (currentLessonPage - 1) * pageSize;
+      let displayLessons = allSubjectLessons.slice(startIndex, startIndex + pageSize);
+
+      let paginationHtml = '';
+      if (totalLessonPages > 1) {
+        paginationHtml = `
+          <div>
+            <button class="btn btn-secondary" style="padding:3px 8px;" ${currentLessonPage === 1 ? 'disabled style="opacity:0.5;"' : ''} onclick="changeLessonPage(${currentLessonPage - 1})">◀ 前の10日分</button>
+            <span class="page-info" style="margin: 0 8px;">授業ページ ${currentLessonPage} / ${totalLessonPages}</span>
+            <button class="btn btn-secondary" style="padding:3px 8px;" ${currentLessonPage === totalLessonPages ? 'disabled style="opacity:0.5;"' : ''} onclick="changeLessonPage(${currentLessonPage + 1})">次の10日分 ▶</button>
+          </div>
+          <span style="font-size:0.8rem; color:#718096;">全 ${allSubjectLessons.length} 回中</span>
+        `;
+      } else {
+        paginationHtml = `<span class="page-info">登録授業数: 全 ${allSubjectLessons.length} 回</span>`;
+      }
+
+      document.getElementById('pagination-bar-top').innerHTML = paginationHtml;
+      document.getElementById('pagination-bar-bottom').innerHTML = paginationHtml;
+
+      let wrapperHtml = `<div class="table-container">`;
+      wrapperHtml += `<table><thead><tr><th>クラス/番号</th><th class="name">氏名</th>`;
+      displayLessons.forEach(lesson => { wrapperHtml += `<th>${formatLessonHeader(lesson)}</th>`; });
+      wrapperHtml += `<th class="no-print">集計</th></tr></thead><tbody>`;
+
+      students.forEach((student) => {
+        wrapperHtml += `<tr>`;
+        const displayId = student.className ? `${student.className}-${student.number}` : student.number || student.id;
+        wrapperHtml += `<td class="student-info">${displayId}</td>`;
+        wrapperHtml += `<td class="name">${student.name}</td>`;
+
+        displayLessons.forEach(lesson => {
+          const key = `${student.id}_${lesson}`;
+          const currentStatus = attendanceData[key] || "出席";
+          wrapperHtml += `<td>
+            <select class="status-select ${getStatusClass(currentStatus)}" onchange="changeStatus(${student.id}, '${lesson}', this.value)">
+              <option value="出席" ${currentStatus === "出席" ? "selected" : ""}>-</option>
+              <option value="欠席" ${currentStatus === "欠席" ? "selected" : ""}>欠席</option>
+              <option value="遅刻" ${currentStatus === "遅刻" ? "selected" : ""}>遅刻</option>
+              <option value="早退" ${currentStatus === "早退" ? "selected" : ""}>早退</option>
+              <option value="中抜け" ${currentStatus === "中抜け" ? "selected" : ""}>中抜け</option>
+            </select>
+          </td>`;
+        });
+
+        wrapperHtml += `<td class="no-print">
+          <button class="btn btn-info" style="padding:2px 6px; font-size:0.7rem;" onclick="openSummaryModal(${student.id}, '${student.name}')">📊 確認</button>
+        </td>`;
+        wrapperHtml += `</tr>`;
+      });
+
+      wrapperHtml += `</tbody></table></div>`;
+      wrapper.innerHTML = wrapperHtml;
+    }
+
+    function resetData() {
+      if (confirm("すべてのデータを初期化してリセットしますか？")) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    window.onload = function() { renderTable(); };
+  </script>
+</body>
+</html>
