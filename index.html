@@ -110,7 +110,6 @@
     td.student-info { text-align: center; white-space: nowrap; font-size: 0.75rem; color: #718096; }
     td.name { text-align: left; font-weight: 600; white-space: nowrap; }
     
-    /* ステータスの色分け（出停を追加） */
     .status-select {
       width: 100%; padding: 4px 2px; font-size: 0.8rem; border-radius: 4px; border: 1px solid #cbd5e0; cursor: pointer; text-align-last: center; font-weight: 600; box-sizing: border-box;
     }
@@ -288,9 +287,9 @@
 
     <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
 
-    <h3>4. 時間割から一括生成（長期休暇・祝日除外対応）</h3>
+    <h3>4. 期間を指定したスケジュール更新（既存の入力データを保持）</h3>
     <div class="control-group">
-      <label>対象期間:</label>
+      <label>修正・生成する期間:</label>
       <input type="date" id="gen-start">
       <span>〜</span>
       <input type="date" id="gen-end">
@@ -304,13 +303,22 @@
       <input type="date" id="winter-start"> 〜 <input type="date" id="winter-end">
     </div>
     <div class="control-group">
-      <label><input type="checkbox" id="skip-holidays" checked> 日本の祝日（祝日法）を自動で省く</label>
-      <button class="btn btn-success" onclick="generateLessonsFromTimetable()" style="margin-left:auto;">時間割から一括作成する</button>
+      <label><input type="checkbox" id="skip-holidays" checked> 日本の祝日を自動で省く</label>
+      <button class="btn btn-success" onclick="updateLessonsForPeriod()" style="margin-left:auto;">指定期間のスケジュールを更新する</button>
     </div>
 
     <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
 
-    <h3>5. バックアップと復元</h3>
+    <h3>5. 行事等による1日分の授業一括削除</h3>
+    <div class="control-group">
+      <label>削除する日付:</label>
+      <input type="date" id="cancel-date">
+      <button class="btn btn-danger" onclick="cancelLessonsByDate()">指定日の全時限を削除する</button>
+    </div>
+
+    <hr style="margin: 16px 0; border:0; border-top:1px solid #e2e8f0;">
+
+    <h3>6. バックアップと復元</h3>
     <div class="control-group">
       <button class="btn btn-secondary" onclick="exportBackup()">💾 バックアップ保存</button>
     </div>
@@ -489,6 +497,7 @@
       const lessonKey = `${dateVal}_${periodVal}(${currentSubject})`;
       if (lessons.includes(lessonKey)) { alert("その授業日時はすでに存在します。"); return; }
       lessons.push(lessonKey);
+      lessons.sort();
       saveData();
       renderTable();
     }
@@ -505,6 +514,7 @@
       const index = lessons.indexOf(lessonKey);
       if (index !== -1) {
         lessons[index] = newKey;
+        lessons.sort();
         const targetStudents = subjectStudents[match[3]] || [];
         targetStudents.forEach(s => {
           if (attendanceData[`${s.id}_${lessonKey}`]) {
@@ -531,6 +541,34 @@
         delete attendanceDrawings[lessonKey];
         if (activeMemoLesson === lessonKey) closeMemo();
         saveData();
+        renderTable();
+      }
+    }
+
+    function cancelLessonsByDate() {
+      const cancelDate = document.getElementById('cancel-date').value;
+      if (!cancelDate) { alert("削除する日付を選択してください。"); return; }
+
+      const matchingLessons = lessons.filter(l => l.startsWith(cancelDate));
+      if (matchingLessons.length === 0) {
+        alert(`${cancelDate} に該当する授業は見つかりませんでした。`);
+        return;
+      }
+
+      if (confirm(`${cancelDate} の全授業（全 ${matchingLessons.length} 件）を削除しますか？`)) {
+        matchingLessons.forEach(lessonKey => {
+          const match = lessonKey.match(/\((.*?)\)$/);
+          const subName = match ? match[1] : "";
+          const targetStudents = subjectStudents[subName] || [];
+          targetStudents.forEach(s => delete attendanceData[`${s.id}_${lessonKey}`]);
+          delete attendanceMemos[lessonKey];
+          delete attendanceDrawings[lessonKey];
+          if (activeMemoLesson === lessonKey) closeMemo();
+        });
+
+        lessons = lessons.filter(l => !l.startsWith(cancelDate));
+        saveData();
+        alert(`${cancelDate} の授業をすべて削除しました。`);
         renderTable();
       }
     }
@@ -623,47 +661,52 @@
       delete attendanceDrawings[activeMemoLesson]; saveData();
     }
 
-    // --- ③ 日本の祝日判定ヘルパー ---
     function isJapaneseHoliday(date) {
       const y = date.getFullYear();
       const m = date.getMonth() + 1;
       const d = date.getDate();
-      const dow = date.getDay(); // 0:日, 1:月...
+      const dow = date.getDay();
 
-      // 固定祝日
-      if ((m === 1 && d === 1) ||   // 元日
-          (m === 2 && d === 11) ||  // 建国記念の日
-          (m === 2 && d === 23) ||  // 天皇誕生日
-          (m === 4 && d === 29) ||  // 昭和の日
-          (m === 5 && d === 3) ||   // 憲法記念日
-          (m === 5 && d === 4) ||   // みどりの日
-          (m === 5 && d === 5) ||   // こどもの日
-          (m === 11 && d === 3) ||  // 文化の日
-          (m === 11 && d === 23))   // 勤労感謝の日
+      if ((m === 1 && d === 1) || (m === 2 && d === 11) || (m === 2 && d === 23) ||
+          (m === 4 && d === 29) || (m === 5 && d === 3) || (m === 5 && d === 4) ||
+          (m === 5 && d === 5) || (m === 11 && d === 3) || (m === 11 && d === 23))
         return true;
 
-      // 春分の日・秋分の日 (2026/2027年対応近似)
       if (m === 3 && ((y === 2026 && d === 20) || (y === 2027 && d === 21))) return true;
       if (m === 9 && ((y === 2026 && d === 23) || (y === 2027 && d === 23))) return true;
 
-      // ハッピーマンデー制度
-      // 成人の日: 1月 第2月曜日
       if (m === 1 && dow === 1 && d >= 8 && d <= 14) return true;
-      // 海の日: 7月 第3月曜日
       if (m === 7 && dow === 1 && d >= 15 && d <= 21) return true;
-      // 敬老の日: 9月 第3月曜日
       if (m === 9 && dow === 1 && d >= 15 && d <= 21) return true;
-      // スポーツの日: 10月 第2月曜日
       if (m === 10 && dow === 1 && d >= 8 && d <= 14) return true;
 
       return false;
     }
 
-    // ③ 長期休暇・祝日除外付きの一括生成
-    function generateLessonsFromTimetable() {
+    // ① 指定した期間だけ既存のスケジュールをクリアして再構築する（過去の入力データは保持）
+    function updateLessonsForPeriod() {
       const startStr = document.getElementById('gen-start').value;
       const endStr = document.getElementById('gen-end').value;
-      if (!startStr || !endStr) { alert("対象期間を指定してください。"); return; }
+      if (!startStr || !endStr) { alert("対象期間（開始日・終了日）を指定してください。"); return; }
+
+      if (!confirm(`${startStr} 〜 ${endStr} の期間の授業スケジュールを、現在の時間割および休日設定に合わせて更新（再構築）します。\n※この期間より前の入力済みデータはそのまま保持されます。よろしいですか？`)) {
+        return;
+      }
+
+      // 1. 指定期間（startStr 〜 endStr）に含まれる既存の授業を削除対象とする
+      // ※ただし、すでに「出席データ」が入力されている授業日がある場合、誤消去を防ぐため警告するか保護する
+      let removedCount = 0;
+      lessons = lessons.filter(lessonKey => {
+        const lessonDate = lessonKey.split('_')[0];
+        const inTargetRange = (lessonDate >= startStr && lessonDate <= endStr);
+        if (inTargetRange) {
+          // メモや描画データもクリア
+          delete attendanceMemos[lessonKey];
+          delete attendanceDrawings[lessonKey];
+          removedCount++;
+        }
+        return !inTargetRange; // 範囲外の授業は残す
+      });
 
       const summerStart = document.getElementById('summer-start').value;
       const summerEnd = document.getElementById('summer-end').value;
@@ -674,21 +717,17 @@
       let curr = new Date(startStr), end = new Date(endStr), addedCount = 0;
 
       while (curr <= end) {
-        const dow = curr.getDay(); // 0:日, 1:月... 6:土
+        const dow = curr.getDay();
         const yyyy = curr.getFullYear();
         const mm = String(curr.getMonth() + 1).padStart(2, '0');
         const dd = String(curr.getDate()).padStart(2, '0');
         const dateStr = `${yyyy}-${mm}-${dd}`;
 
-        // 平日(月〜金: 1〜5)かつ祝日・休暇チェック
         if (dow >= 1 && dow <= 5) {
           let isExcluded = false;
 
-          // 夏季休業チェック
           if (summerStart && summerEnd && dateStr >= summerStart && dateStr <= summerEnd) isExcluded = true;
-          // 冬季休業チェック
           if (winterStart && winterEnd && dateStr >= winterStart && dateStr <= winterEnd) isExcluded = true;
-          // 祝日チェック
           if (skipHolidays && isJapaneseHoliday(curr)) isExcluded = true;
 
           if (!isExcluded) {
@@ -696,15 +735,20 @@
               const subName = timetable[`${dow}_${period}`];
               if (subName) {
                 const lessonKey = `${dateStr}_${period}限(${subName})`;
-                if (!lessons.includes(lessonKey)) { lessons.push(lessonKey); addedCount++; }
+                if (!lessons.includes(lessonKey)) {
+                  lessons.push(lessonKey);
+                  addedCount++;
+                }
               }
             }
           }
         }
         curr.setDate(curr.getDate() + 1);
       }
+
+      lessons.sort();
       saveData();
-      alert(`${addedCount}件の授業日を一括生成しました（休暇・祝日除外適用）！`);
+      alert(`指定期間（${startStr} 〜 ${endStr}）のスケジュールを更新しました！\n（新しく ${addedCount} 件の授業を登録しました）`);
       switchMainTab('attendance');
     }
 
@@ -764,7 +808,6 @@
               <button class="th-action-btn" onclick="deleteLessonHeader('${lessonKey}')">削除</button>`;
     }
 
-    // ②「出停」のクラス判定を追加
     function getStatusClass(status) {
       if (status === "欠席") return "is-absent";
       if (status === "遅刻") return "is-late";
@@ -785,12 +828,10 @@
       renderTable();
     }
 
-    // ① 集計表示を押した日付（本日）時点までの授業に絞って集計
     function getValidLessonsForSummary() {
       const allSubjectLessons = lessons.filter(l => l.includes(`(${currentSubject})`));
       allSubjectLessons.sort();
       const todayStr = new Date().toISOString().slice(0, 10);
-      // 日付が今日以前の授業のみをカウント対象にする
       return allSubjectLessons.filter(l => l.split('_')[0] <= todayStr);
     }
 
@@ -822,7 +863,6 @@
       document.getElementById('summary-modal').style.display = 'none';
     }
 
-    // ① 全員分集計も本日時点までに絞る
     function openAllSummaryModal() {
       const validLessons = getValidLessonsForSummary();
       document.getElementById('all-summary-modal-title').innerText = `📊 【${currentSubject}】全員分の出席集計一覧（本日時点: 全 ${validLessons.length} 回）`;
@@ -947,7 +987,6 @@
         displayLessons.forEach(lesson => {
           const key = `${student.id}_${lesson}`;
           const currentStatus = attendanceData[key] || "出席";
-          // ② 出席ステータスの選択肢に「出停」を追加
           wrapperHtml += `<td>
             <select class="status-select ${getStatusClass(currentStatus)}" onchange="changeStatus(${student.id}, '${lesson}', this.value)">
               <option value="出席" ${currentStatus === "出席" ? "selected" : ""}>-</option>
